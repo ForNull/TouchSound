@@ -50,6 +50,7 @@ function Keys:keySplash(funcCall)
 	local keyWait = display.newSpriteFrame("wait.png")
 	local frames = {keyUp, keyWait, keyUp, keyWait, keyUp, keyWait}
 	local animation = display.newAnimation(frames, 1 / 6)
+
 	transition.playAnimationOnce(self,animation,false,funcCall)
 end
 

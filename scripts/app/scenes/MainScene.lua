@@ -67,7 +67,7 @@ function MainScene:ctor()
     self.waitTag = 0
     self.waitKeys = {}
     self.lastKeys = {}
-    self.playStatus = {"dead", "waitToPlay", "playing"}
+    self.playStatus = {"dead", "waitToPlay", "playing", "splash"}
     self.status = self.playStatus[1]
     self.musicScoresPlayed = {}
     self.musicScoresPlaying = 0
@@ -136,7 +136,6 @@ function MainScene:initLabels()
 end
 
 function MainScene:keyPressed(key, p)
-    print(key.tone)
     for i,v in ipairs(self.waitKeys) do
         if v.tag == key.tag then
             self.lastKeys[#self.lastKeys + 1] = v
@@ -176,8 +175,11 @@ function MainScene:keyPressed(key, p)
 end
 
 function MainScene:onTouch(event, points)
+    -- print(11111111111111111111)
+    -- print(event)
     local tp = {}
     for i=1, #points, 3 do
+        -- print(points[i+2].." "..points[i].." "..points[i+1])
         local p = ccp(points[i], points[i + 1])
         tp[#tp + 1] = p
     end
@@ -203,10 +205,15 @@ function MainScene:onTouch(event, points)
                     if _v:getBoundingBox():containsPoint(v) then
                         if _v.type == "wait" then
                             self:keyPressed(_v, v)
-                        else
-                            self:gameEnded()
                         end
                     end
+                end
+            end
+        -- dead
+        elseif self.status == self.playStatus[1] then
+            for i,v in ipairs(tp) do
+                if self.tryAgainLabel:getBoundingBox():containsPoint(v) then
+                    self:restart()
                 end
             end
         end
@@ -224,29 +231,32 @@ end
 function MainScene:restart()
     self.score = 0
     self.scoreLabel:setString("0")
-    self:removeChild(self.gameOverLabel)
-    self:removeChild(self.yourScoreLabel)
-    self:removeChild(self.getScoreLabel)
-    self:removeChild(self.pointsLabel)
-    self:removeChild(self.tryAgainLabel)
+    self:removeChild(self.gameOverLabel,true)
+    self:removeChild(self.yourScoreLabel,true)
+    self:removeChild(self.getScoreLabel,true)
+    self:removeChild(self.pointsLabel,true)
+    self:removeChild(self.tryAgainLabel,true)
     self.menuBg:setVisible(false)
     self.progressTime:setPercentage(100.0)
     self:enableMenu()
+    waitTime = 120
+    self.level = 1
 
     --重置琴键
-    for i,v in ipairs(self.waitKeys) do
-        v:keyUp()
-        table.remove(self.waitKeys, i)
+    for i = 1, #self.waitKeys do
+        self.waitKeys[1]:keyUp()
+        table.remove(self.waitKeys, 1)
     end
 
-    for ii,vv in ipairs(self.lastKeys) do
-        table.remove(self.lastKeys, ii)
+    for i = 1, #self.lastKeys do
+        table.remove(self.lastKeys, 1)
     end
 
     --重置乐谱
-    for _i,_v in ipairs(self.musicScoresPlayed) do
-        table.remove(self.musicScoresPlayed, _i)
+    for i = 1, #self.musicScoresPlayed do
+        table.remove(self.musicScoresPlayed, 1)
     end
+
     self.musicScoresPlaying = 0
     self.musicScorePos = 0
 
@@ -264,8 +274,17 @@ end
 
 function MainScene:genWaitKeys()
     if #self.waitKeys == 0 then
-        if self.level == 1 then
+        if self.level == 1 or self.level == 2 or self.level == 3  then
             self:genWaitKey(1)
+        elseif self.level >= 4 then
+            local num = math.random(2)
+            if num == 1 then
+                self:genWaitKey(1)
+            else
+                self:genWaitKey(1)
+                -- self:genWaitKey(1)
+                self:genWaitKey(1, self.waitKeys[#self.waitKeys].tone)
+            end
         end
 
         while #self.lastKeys > 0 do
@@ -276,12 +295,18 @@ function MainScene:genWaitKeys()
     end    
 end
 
-function MainScene:genWaitKey(type)
+function MainScene:genWaitKey(type, tone)
     local num
     while true do
         num = math.random(16)
         local flag = true
         for i,v in ipairs(self.lastKeys) do
+            if v.tag == num then
+                flag = false
+            end
+        end
+
+        for i,v in ipairs(self.waitKeys) do
             if v.tag == num then
                 flag = false
             end
@@ -295,7 +320,12 @@ function MainScene:genWaitKey(type)
     for i,v in ipairs(self.keysUp) do
         if v.tag == num then
             self.waitKeys[#self.waitKeys + 1] = v
-            v.tone = self:getMusicScore()
+            if tone then
+                v.tone = tone
+            else
+                v.tone = self:getMusicScore()
+            end
+
             if self.status == self.playStatus[3] then
                 if type == 1 then
                     v:keyWait()
@@ -362,24 +392,32 @@ function MainScene:getMusicScore()
 end
 
 function MainScene:gameEnded()    
-    self.status = self.playStatus[1]
+    self.status = self.playStatus[4]
     for i,v in ipairs(self.waitKeys) do
-        v:keySplash(handler(self,self.gameEnded2))
+        if i == 1 then
+            v:keySplash(handler(self,self.gameEnded2))
+        else
+            v:keySplash()
+        end
     end
 
     
 end
 
 function MainScene:gameEnded2()
-    self.menuBg:setVisible(true)
-    self:addGameOverLabel()
-    self:addScoreLabel()
-    self:addTryAgainLabel()
-    self:disableMenu()
+    if self.status == self.playStatus[4] then
+        self.menuBg:setVisible(true)
+        self:addGameOverLabel()
+        self:addScoreLabel()
+        self:addTryAgainLabel()
+        self:disableMenu()
 
-    if highScore > GameData.highScore then
-        GameData.highScore  = highScore 
-        GameState.save(GameData)
+        if highScore > GameData.highScore then
+            GameData.highScore  = highScore 
+            GameState.save(GameData)
+        end
+
+        self.status = self.playStatus[1]
     end
 end
 
@@ -442,10 +480,10 @@ function MainScene:addTryAgainLabel()
             color = textColor,
         })
     self:addChild(self.tryAgainLabel,100)
-    self.tryAgainLabel:setTouchEnabled(true)
-    self.tryAgainLabel:addTouchEventListener(function(event, x, y)
-        return self:onTouchTryAgain(event, x, y)
-    end)
+    -- self.tryAgainLabel:setTouchEnabled(true)
+    -- self.tryAgainLabel:addTouchEventListener(function(event, x, y)
+    --     return self:onTouchTryAgain(event, x, y)
+    -- end)
 end
 
 function MainScene:enableMenu()
@@ -458,11 +496,34 @@ function MainScene:disableMenu()
     self.menu:setDisplayFrame(spriteFrame)
 end
 
+function MainScene:levelUpdate()
+    if self.level == 1 and self.score == 5 then
+        waitTime = waitTime - 20
+        self.level = self.level + 1
+    elseif self.level == 2 and self.score == 10 then
+        waitTime = waitTime - 20
+        self.level = self.level + 1
+    elseif self.level == 3 and self.score == 15 then
+        waitTime = waitTime - 20
+        self.level = self.level + 1
+    elseif self.level == 4 and self.score == 20 then
+    --     waitTime = waitTime - 10
+    --     self.level = self.level + 1
+    -- elseif self.level == 5 and self.score == 25 then
+    --     waitTime = waitTime - 10
+    --     self.level = self.level + 1
+    -- elseif self.level == 6 and self.score == 30 then
+        self.level = self.level + 1
+        waitTime = 90
+    end
+end
+
 function MainScene:updateFrame(dt)
     if self.status == self.playStatus[3] then
         if self.waitTag == 0 and #self.waitKeys > 0 then
             self:gameEnded()
         else
+            self:levelUpdate()
             self.waitTag = self.waitTag - 1
             self.progressTime:setPercentage(self.progressTime:getPercentage() - 100 / waitTime)
         end
