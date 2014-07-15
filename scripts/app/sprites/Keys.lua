@@ -2,15 +2,15 @@
 -- Author: ejian
 -- Date: 2014-05-19 22:25:07
 --
-local Keys = class("Keys", function(pic)
-    return display.newSprite(pic)
+local Keys = class("Keys", function()
+    return display.newSprite("#wait.png")
 end)
 
 local keyWidht = 140
 local dis = 6
 
 function Keys:ctor()
-	self.type = "free"
+	self.type = "wait"
 end
 
 function Keys:setPlace(order, bgx, bgy)
@@ -33,9 +33,9 @@ function Keys:keyUp()
 end
 
 function Keys:keyWait()
-	self.type = "wait"
-	local spriteFrame = display.newSpriteFrame("wait.png")
-	self:setDisplayFrame(spriteFrame)
+	-- self.type = "wait"
+	-- local spriteFrame = display.newSpriteFrame("wait.png")
+	-- self:setDisplayFrame(spriteFrame)
 end
 
 function Keys:keyFirstWait()

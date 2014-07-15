@@ -1,6 +1,7 @@
 
 require("framework.scheduler")
 local Keys = import("..sprites.Keys")
+local KeysBack = import("..sprites.KeysBack")
 local MusicScore = import("..data.MusicScore")
 
 local MainScene = class("MainScene", function()
@@ -11,6 +12,7 @@ local waitTime = 120
 local textFont = "Tahoma"
 local textFont_bold = "Tahoma"
 local textColor = ccc3(248, 243, 223)
+local playStatus = {"dead", "waitToPlay", "playing", "splash"}
 
 function MainScene:ctor()
     -- touchLayer 用于接收触摸事件
@@ -42,7 +44,7 @@ function MainScene:ctor()
     --     return self:onTouchMenu(event, x, y)
     -- end)
 
-    --添加键盘背景
+    --添加键盘区底色
     self.bg = display.newSprite("#bg.png", display.cx, display.bottom + 388)
     self.batch:addChild(self.bg)
 
@@ -55,20 +57,23 @@ function MainScene:ctor()
     self:addChild(self.menuBg, 0)
     self.menuBg:setVisible(false)
 
-    self.keysUp = {}
+    --按键背景
+    self.keysBacks = {}
+    self.positions = {}
     for i=0,15 do
-        local key = Keys.new("#up.png")
+        local key = KeysBack.new()
         key:setPlace(i, display.cx, display.bottom + 388)
         self.batch:addChild(key)
-        self.keysUp[#self.keysUp + 1] = key
+        self.keysBacks[#self.keysBacks + 1] = key
         key.tag = i + 1 --从左往右，从下往上
+
+        self.positions[#self.positions + 1] = {x = key:getPositionX(), y = key:getPositionY()}
     end
 
     self.waitTag = 0
     self.waitKeys = {}
     self.lastKeys = {}
-    self.playStatus = {"dead", "waitToPlay", "playing", "splash"}
-    self.status = self.playStatus[1]
+    self.status = "dead"
     self.musicScoresPlayed = {}
     self.musicScoresPlaying = 0
     self.musicScorePos = 0
@@ -138,7 +143,7 @@ end
 function MainScene:keyPressed(key, p)
     for i,v in ipairs(self.waitKeys) do
         if v.tag == key.tag then
-            self.lastKeys[#self.lastKeys + 1] = v
+            self.lastKeys[#self.lastKeys + 1] = key
             table.remove(self.waitKeys, i)                    
             key:keyDown()
 
@@ -146,12 +151,13 @@ function MainScene:keyPressed(key, p)
 
             audio.playSound(PIANO_SOUND[key.tone], false)
             self:performWithDelay(function()
-                key:keyUp()
+                -- key:keyUp()
+                self:removeChild(key, true)
             end, 0.03)
             -- key:keyUp()
 
-            if self.status == self.playStatus[2] then
-                self.status = self.playStatus[3]
+            if self.status == "waitToPlay" then
+                self.status = "playing"
                 self.waitTag = waitTime
             end
 
@@ -175,8 +181,6 @@ function MainScene:keyPressed(key, p)
 end
 
 function MainScene:onTouch(event, points)
-    -- print(11111111111111111111)
-    -- print(event)
     local tp = {}
     for i=1, #points, 3 do
         -- print(points[i+2].." "..points[i].." "..points[i+1])
@@ -186,22 +190,29 @@ function MainScene:onTouch(event, points)
 
     if event == "began" then
         --playing
-        if self.status == self.playStatus[3] then
-            for i,v in ipairs(tp) do
-                for _i,_v in ipairs(self.keysUp) do
-                    if _v:getBoundingBox():containsPoint(v) then
-                        if _v.type == "wait" then
-                            self:keyPressed(_v, v)
-                        else
+        if self.status == "playing" then
+            for i,p in ipairs(tp) do --触摸点循环
+                for ii,keysback in ipairs(self.keysBacks) do --背景按键循环
+                    if keysback:getBoundingBox():containsPoint(p) then --如果按到了按键
+                        local isWaitKey = false
+                        for iii,keyswait in ipairs(self.waitKeys) do --等待按键循环
+                            if keyswait:getBoundingBox():containsPoint(p) and keyswait.type == "wait" then
+                                isWaitKey = true
+                                self:keyPressed(keyswait, p)
+                                break
+                            end
+                        end
+
+                        if not isWaitKey then --按到了其他按键上
                             self:gameEnded()
                         end
                     end
-                end
+                end                
             end
         --wait to play
-        elseif self.status == self.playStatus[2] then
+        elseif self.status == "waitToPlay" then
             for i,v in ipairs(tp) do
-                for _i,_v in ipairs(self.keysUp) do
+                for _i,_v in ipairs(self.waitKeys) do
                     if _v:getBoundingBox():containsPoint(v) then
                         if _v.type == "wait" then
                             self:keyPressed(_v, v)
@@ -210,7 +221,7 @@ function MainScene:onTouch(event, points)
                 end
             end
         -- dead
-        elseif self.status == self.playStatus[1] then
+        elseif self.status == "dead" then
             for i,v in ipairs(tp) do
                 if self.tryAgainLabel:getBoundingBox():containsPoint(v) then
                     self:restart()
@@ -260,7 +271,7 @@ function MainScene:restart()
     self.musicScoresPlaying = 0
     self.musicScorePos = 0
 
-    self.status = self.playStatus[2]
+    self.status = "waitToPlay"
     self:genWaitKeys()
 end
 
@@ -317,24 +328,22 @@ function MainScene:genWaitKey(type, tone)
         end
     end
 
-    for i,v in ipairs(self.keysUp) do
-        if v.tag == num then
-            self.waitKeys[#self.waitKeys + 1] = v
-            if tone then
-                v.tone = tone
-            else
-                v.tone = self:getMusicScore()
-            end
+    local genedKey = Keys.new()
+    genedKey.tag = num
+    genedKey:setPosition(self.positions[num].x, self.positions[num].y)
+    self:addChild(genedKey, -8)
+    self.waitKeys[#self.waitKeys + 1] = genedKey
 
-            if self.status == self.playStatus[3] then
-                if type == 1 then
-                    v:keyWait()
-                end
-                self.waitTag = waitTime
-            elseif self.status == self.playStatus[2] then
-                v:keyFirstWait()
-            end
-        end
+    if tone then
+        genedKey.tone = tone
+    else
+        genedKey.tone = self:getMusicScore()
+    end
+
+    if self.status == "playing" then        
+        self.waitTag = waitTime
+    elseif self.status == "waitToPlay" then
+        genedKey:keyFirstWait()
     end
 end
 
@@ -392,7 +401,7 @@ function MainScene:getMusicScore()
 end
 
 function MainScene:gameEnded()    
-    self.status = self.playStatus[4]
+    self.status = "splash"
     for i,v in ipairs(self.waitKeys) do
         if i == 1 then
             v:keySplash(handler(self,self.gameEnded2))
@@ -405,7 +414,7 @@ function MainScene:gameEnded()
 end
 
 function MainScene:gameEnded2()
-    if self.status == self.playStatus[4] then
+    if self.status == "splash" then
         self.menuBg:setVisible(true)
         self:addGameOverLabel()
         self:addScoreLabel()
@@ -417,7 +426,7 @@ function MainScene:gameEnded2()
             GameState.save(GameData)
         end
 
-        self.status = self.playStatus[1]
+        self.status = "dead"
     end
 end
 
@@ -519,7 +528,7 @@ function MainScene:levelUpdate()
 end
 
 function MainScene:updateFrame(dt)
-    if self.status == self.playStatus[3] then
+    if self.status == "playing" then
         if self.waitTag == 0 and #self.waitKeys > 0 then
             self:gameEnded()
         else
@@ -532,7 +541,7 @@ function MainScene:updateFrame(dt)
 end
 
 function MainScene:onEnter()
-    -- self.status = self.playStatus[2]
+    -- self.status = "waitToPlay"
     -- self:genWaitKeys()
     self:restart()
 
