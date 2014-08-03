@@ -20,7 +20,7 @@
             <key>down.png</key>
             <dict>
                 <key>frame</key>
-                <string>{{221,594},{140,140}}</string>
+                <string>{{286,878},{140,140}}</string>
                 <key>offset</key>
                 <string>{0,0}</string>
                 <key>rotated</key>
@@ -72,7 +72,7 @@
             <key>up.png</key>
             <dict>
                 <key>frame</key>
-                <string>{{144,736},{140,140}}</string>
+                <string>{{363,594},{140,140}}</string>
                 <key>offset</key>
                 <string>{0,0}</string>
                 <key>rotated</key>
@@ -85,7 +85,7 @@
             <key>wait.png</key>
             <dict>
                 <key>frame</key>
-                <string>{{79,594},{140,140}}</string>
+                <string>{{286,736},{140,140}}</string>
                 <key>offset</key>
                 <string>{0,0}</string>
                 <key>rotated</key>
@@ -96,6 +96,58 @@
                 <string>{140,140}</string>
             </dict>
             <key>wait1.png</key>
+            <dict>
+                <key>frame</key>
+                <string>{{144,878},{140,140}}</string>
+                <key>offset</key>
+                <string>{0,0}</string>
+                <key>rotated</key>
+                <false/>
+                <key>sourceColorRect</key>
+                <string>{{0,0},{140,140}}</string>
+                <key>sourceSize</key>
+                <string>{140,140}</string>
+            </dict>
+            <key>wait_down.png</key>
+            <dict>
+                <key>frame</key>
+                <string>{{221,594},{140,140}}</string>
+                <key>offset</key>
+                <string>{0,0}</string>
+                <key>rotated</key>
+                <false/>
+                <key>sourceColorRect</key>
+                <string>{{0,0},{140,140}}</string>
+                <key>sourceSize</key>
+                <string>{140,140}</string>
+            </dict>
+            <key>wait_left.png</key>
+            <dict>
+                <key>frame</key>
+                <string>{{144,736},{140,140}}</string>
+                <key>offset</key>
+                <string>{0,0}</string>
+                <key>rotated</key>
+                <false/>
+                <key>sourceColorRect</key>
+                <string>{{0,0},{140,140}}</string>
+                <key>sourceSize</key>
+                <string>{140,140}</string>
+            </dict>
+            <key>wait_right.png</key>
+            <dict>
+                <key>frame</key>
+                <string>{{79,594},{140,140}}</string>
+                <key>offset</key>
+                <string>{0,0}</string>
+                <key>rotated</key>
+                <false/>
+                <key>sourceColorRect</key>
+                <string>{{0,0},{140,140}}</string>
+                <key>sourceSize</key>
+                <string>{140,140}</string>
+            </dict>
+            <key>wait_up.png</key>
             <dict>
                 <key>frame</key>
                 <string>{{2,746},{140,140}}</string>
@@ -118,7 +170,7 @@
             <key>size</key>
             <string>{1024,1024}</string>
             <key>smartupdate</key>
-            <string>$TexturePacker:SmartUpdate:e33f7d705166a5e7f47c6a1aaafccd4a:1/1$</string>
+            <string>$TexturePacker:SmartUpdate:b3e573ec2ad738f2c96c732b11a7d535:1/1$</string>
             <key>textureFileName</key>
             <string>pic.png</string>
         </dict>

@@ -8,11 +8,14 @@ local MainScene = class("MainScene", function()
     return display.newScene("MainScene")
 end)
 
-local waitTime = 120
+local waitTimeValue = 50
+local waitTime = waitTimeValue
 local textFont = "Tahoma"
 local textFont_bold = "Tahoma"
 local textColor = ccc3(248, 243, 223)
 local playStatus = {"dead", "waitToPlay", "playing", "splash"}
+local px, py = display.cx, display.bottom + 388
+local keyAreaWidth, keyAreaHeight = 590, 590
 
 function MainScene:ctor()
     -- touchLayer 用于接收触摸事件
@@ -34,7 +37,7 @@ function MainScene:ctor()
     self:addChild(self.batch, -9)
 
     self:initLabels()
-    self:initProgress()
+    -- self:initProgress()
 
     --添加菜单按钮
     self.menu = display.newSprite("#menu1.png", display.right - 70, display.top - 65)
@@ -44,9 +47,13 @@ function MainScene:ctor()
     --     return self:onTouchMenu(event, x, y)
     -- end)
 
+    
+    self.keyArea = display.newClippingRegionNode(CCRect(px - keyAreaWidth / 2, py - keyAreaHeight / 2, px + keyAreaWidth / 2, py + keyAreaHeight / 2))
+    self:addChild(self.keyArea, -8)
+
     --添加键盘区底色
-    self.bg = display.newSprite("#bg.png", display.cx, display.bottom + 388)
-    self.batch:addChild(self.bg)
+    self.bg = display.newSprite("#bg.png", px, py)
+    self.keyArea:addChild(self.bg)
 
     --菜单层
     self.menuBg = display.newSprite()
@@ -62,17 +69,16 @@ function MainScene:ctor()
     self.positions = {}
     for i=0,15 do
         local key = KeysBack.new()
-        key:setPlace(i, display.cx, display.bottom + 388)
-        self.batch:addChild(key)
+        key:setPlace(i, px, py)
+        self.keyArea:addChild(key)
         self.keysBacks[#self.keysBacks + 1] = key
         key.tag = i + 1 --从左往右，从下往上
 
         self.positions[#self.positions + 1] = {x = key:getPositionX(), y = key:getPositionY()}
     end
 
-    self.waitTag = 0
+    self.waitTag = waitTime
     self.waitKeys = {}
-    self.lastKeys = {}
     self.status = "dead"
     self.musicScoresPlayed = {}
     self.musicScoresPlaying = 0
@@ -143,22 +149,21 @@ end
 function MainScene:keyPressed(key, p)
     for i,v in ipairs(self.waitKeys) do
         if v.tag == key.tag then
-            self.lastKeys[#self.lastKeys + 1] = key
             table.remove(self.waitKeys, i)                    
-            key:keyDown()
+            -- key:keyDown()
 
             -- local i = math.random(26)
 
-            audio.playSound(PIANO_SOUND[key.tone], false)
+            audio.playSound(PIANO_SOUND[self:getMusicScore()], false)
             self:performWithDelay(function()
                 -- key:keyUp()
-                self:removeChild(key, true)
+                self.keyArea:removeChild(key, true)
             end, 0.03)
             -- key:keyUp()
 
             if self.status == "waitToPlay" then
                 self.status = "playing"
-                self.waitTag = waitTime
+                -- self.waitTag = waitTime
             end
 
             self.score = self.score + 1
@@ -172,12 +177,12 @@ function MainScene:keyPressed(key, p)
         end
     end
 
-    if #self.waitKeys == 0 then
+    -- if #self.waitKeys == 0 then
         -- self:performWithDelay(function()
         --     self:genWaitKeys()
         -- end, 0.3)
-        self:genWaitKeys()
-    end
+    --     self:genWaitKeys()
+    -- end
 end
 
 function MainScene:onTouch(event, points)
@@ -196,7 +201,7 @@ function MainScene:onTouch(event, points)
                     if keysback:getBoundingBox():containsPoint(p) then --如果按到了按键
                         local isWaitKey = false
                         for iii,keyswait in ipairs(self.waitKeys) do --等待按键循环
-                            if keyswait:getBoundingBox():containsPoint(p) and keyswait.type == "wait" then
+                            if keyswait:getBoundingBox():containsPoint(p) and keyswait.status == "wait" then
                                 isWaitKey = true
                                 self:keyPressed(keyswait, p)
                                 break
@@ -214,7 +219,7 @@ function MainScene:onTouch(event, points)
             for i,v in ipairs(tp) do
                 for _i,_v in ipairs(self.waitKeys) do
                     if _v:getBoundingBox():containsPoint(v) then
-                        if _v.type == "wait" then
+                        if _v.status == "wait" then
                             self:keyPressed(_v, v)
                         end
                     end
@@ -248,19 +253,16 @@ function MainScene:restart()
     self:removeChild(self.pointsLabel,true)
     self:removeChild(self.tryAgainLabel,true)
     self.menuBg:setVisible(false)
-    self.progressTime:setPercentage(100.0)
+    -- self.progressTime:setPercentage(100.0)
     self:enableMenu()
-    waitTime = 120
+    waitTime = waitTimeValue
     self.level = 1
 
     --重置琴键
     for i = 1, #self.waitKeys do
-        self.waitKeys[1]:keyUp()
+        -- self.waitKeys[1]:keyUp()
+        self.keyArea:removeChild(self.waitKeys[1], true)
         table.remove(self.waitKeys, 1)
-    end
-
-    for i = 1, #self.lastKeys do
-        table.remove(self.lastKeys, 1)
     end
 
     --重置乐谱
@@ -284,38 +286,19 @@ function MainScene:onTouchMenu(event, x, y)
 end
 
 function MainScene:genWaitKeys()
-    if #self.waitKeys == 0 then
-        if self.level == 1 or self.level == 2 or self.level == 3  then
-            self:genWaitKey(1)
-        elseif self.level >= 4 then
-            local num = math.random(2)
-            if num == 1 then
-                self:genWaitKey(1)
-            else
-                self:genWaitKey(1)
-                -- self:genWaitKey(1)
-                self:genWaitKey(1, self.waitKeys[#self.waitKeys].tone)
-            end
-        end
-
-        while #self.lastKeys > 0 do
-            table.remove(self.lastKeys)
-        end
+    if (self.status == "playing" and self.waitTag <= 0) or (self.status == "waitToPlay") then
+        self:genWaitKey(1)
         
-        self.progressTime:setPercentage(100.0)
+        -- self.progressTime:setPercentage(100.0)
+        self.waitTag = waitTime
     end    
-end
+end   
 
-function MainScene:genWaitKey(type, tone)
+function MainScene:genWaitKey(type)
     local num
     while true do
         num = math.random(16)
         local flag = true
-        for i,v in ipairs(self.lastKeys) do
-            if v.tag == num then
-                flag = false
-            end
-        end
 
         for i,v in ipairs(self.waitKeys) do
             if v.tag == num then
@@ -328,17 +311,12 @@ function MainScene:genWaitKey(type, tone)
         end
     end
 
-    local genedKey = Keys.new()
+    local genedKey = Keys.new(1)
     genedKey.tag = num
     genedKey:setPosition(self.positions[num].x, self.positions[num].y)
-    self:addChild(genedKey, -8)
+    -- self:addChild(genedKey, -8)
+    self.keyArea:addChild(genedKey)
     self.waitKeys[#self.waitKeys + 1] = genedKey
-
-    if tone then
-        genedKey.tone = tone
-    else
-        genedKey.tone = self:getMusicScore()
-    end
 
     if self.status == "playing" then        
         self.waitTag = waitTime
@@ -507,13 +485,13 @@ end
 
 function MainScene:levelUpdate()
     if self.level == 1 and self.score == 5 then
-        waitTime = waitTime - 20
+        waitTime = waitTime - 10
         self.level = self.level + 1
     elseif self.level == 2 and self.score == 10 then
-        waitTime = waitTime - 20
+        waitTime = waitTime - 10
         self.level = self.level + 1
     elseif self.level == 3 and self.score == 15 then
-        waitTime = waitTime - 20
+        waitTime = waitTime - 10
         self.level = self.level + 1
     elseif self.level == 4 and self.score == 20 then
     --     waitTime = waitTime - 10
@@ -523,18 +501,19 @@ function MainScene:levelUpdate()
     --     self.level = self.level + 1
     -- elseif self.level == 6 and self.score == 30 then
         self.level = self.level + 1
-        waitTime = 90
+        -- waitTime = 90
     end
 end
 
 function MainScene:updateFrame(dt)
     if self.status == "playing" then
-        if self.waitTag == 0 and #self.waitKeys > 0 then
+        self:levelUpdate()
+        self.waitTag = self.waitTag - 1
+        if #self.waitKeys >= 3 and self.waitTag <= 0 then
             self:gameEnded()
         else
-            self:levelUpdate()
-            self.waitTag = self.waitTag - 1
-            self.progressTime:setPercentage(self.progressTime:getPercentage() - 100 / waitTime)
+            self:genWaitKeys()
+            -- self.progressTime:setPercentage(self.progressTime:getPercentage() - 100 / waitTime)
         end
     end
     
