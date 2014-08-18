@@ -16,11 +16,10 @@ local Keys = class("Keys", function(type)
 	end
 end)
 
-local keyWidht = 140
+local keyWidth = 140
 local dis = 6
 
 function Keys:ctor(type)
-	self.status = "wait"
 	self.type = type
 
 	if type == 1 then
@@ -40,7 +39,10 @@ function Keys:setPlace(order, bgx, bgy)
 	local a = order % 4
 	local b = math.floor(order / 4)
 
-	self:setPosition(bgx + (a - 2) * (keyWidht + dis) + (keyWidht + dis) / 2, bgy + (b - 2) * (keyWidht + dis) + (keyWidht + dis) / 2)
+	self.x = bgx + (a - 2) * (keyWidth + dis) + (keyWidth + dis) / 2
+	self.y = bgy + (b - 2) * (keyWidth + dis) + (keyWidth + dis) / 2
+
+	self:setPosition(self.x, self.y)
 end
 
 -- function Keys:keyDown()
@@ -62,13 +64,12 @@ end
 -- end
 
 function Keys:keyFirstWait()
-	self.status = "wait"
+	self.type = 1
 	local spriteFrame = display.newSpriteFrame("wait1.png")
 	self:setDisplayFrame(spriteFrame)
 end
 
 function Keys:keySplash(funcCall)
-	self.status = "free"
 	local keyUp = display.newSpriteFrame("up.png")
 	local keyWait = display.newSpriteFrame(self.pic)
 	local frames = {keyUp, keyWait, keyUp, keyWait, keyUp, keyWait}

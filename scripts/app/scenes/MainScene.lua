@@ -16,15 +16,18 @@ local textColor = ccc3(248, 243, 223)
 local playStatus = {"dead", "waitToPlay", "playing", "splash"}
 local px, py = display.cx, display.bottom + 388
 local keyAreaWidth, keyAreaHeight = 590, 590
+local keyWidth = 140
+local dragThreshold = 40
 
 function MainScene:ctor()
     -- touchLayer 用于接收触摸事件
     -- self.touchLayer = display.newColorLayer(ccc4(247,247,239,255))
     self.touchLayer = display.newColorLayer(ccc4(0,0,0,255))
-    self.touchLayer:addTouchEventListener(function(event, points)
-        return self:onTouch(event, points)
-    end, true)
+    self.touchLayer:addNodeEventListener(cc.NODE_TOUCH_EVENT, function(event)
+        return self:onTouches(event)
+    end)
     self.touchLayer:setTouchEnabled(true)
+    self.touchLayer:setTouchMode(cc.TOUCH_MODE_ALL_AT_ONCE)
     self:addChild(self.touchLayer, -20)
 
     local mainBg = display.newSprite("pic/main_bg3.png")
@@ -48,7 +51,8 @@ function MainScene:ctor()
     -- end)
 
     
-    self.keyArea = display.newClippingRegionNode(CCRect(px - keyAreaWidth / 2, py - keyAreaHeight / 2, px + keyAreaWidth / 2, py + keyAreaHeight / 2))
+    -- self.keyArea = display.newClippingRegionNode(CCRect(px - keyAreaWidth / 2, py - keyAreaHeight / 2, px + keyAreaWidth / 2, py + keyAreaHeight / 2))
+    self.keyArea = display.newClippingRegionNode(CCRect(px - keyAreaWidth / 2, py - keyAreaHeight / 2, keyAreaWidth, keyAreaHeight))
     self:addChild(self.keyArea, -8)
 
     --添加键盘区底色
@@ -79,6 +83,7 @@ function MainScene:ctor()
 
     self.waitTag = waitTime
     self.waitKeys = {}
+    self.dragKeys = {}
     self.status = "dead"
     self.musicScoresPlayed = {}
     self.musicScoresPlaying = 0
@@ -146,10 +151,10 @@ function MainScene:initLabels()
     self:addChild(self.highScoreLabel,100)
 end
 
-function MainScene:keyPressed(key, p)
-    for i,v in ipairs(self.waitKeys) do
-        if v.tag == key.tag then
-            table.remove(self.waitKeys, i)                    
+function MainScene:keyPressed(key)
+    -- for i,v in ipairs(self.waitKeys) do
+    --     if v.tag == key.tag then
+    --         table.remove(self.waitKeys, i)                    
             -- key:keyDown()
 
             -- local i = math.random(26)
@@ -173,9 +178,9 @@ function MainScene:keyPressed(key, p)
                 self.highScoreLabel:setString(highScore)
             end
 
-            break
-        end
-    end
+    --         break
+    --     end
+    -- end
 
     -- if #self.waitKeys == 0 then
         -- self:performWithDelay(function()
@@ -185,63 +190,241 @@ function MainScene:keyPressed(key, p)
     -- end
 end
 
-function MainScene:onTouch(event, points)
-    local tp = {}
-    for i=1, #points, 3 do
-        -- print(points[i+2].." "..points[i].." "..points[i+1])
-        local p = ccp(points[i], points[i + 1])
-        tp[#tp + 1] = p
+function MainScene:keyDragBegan(keyWait, id, x, y)
+    local key = {}
+    key.id = id
+    key.x = x
+    key.y = y
+    key.tag = keyWait.tag
+    key.type = keyWait.type
+    self.dragKeys[#self.dragKeys + 1] = key
+end
+
+function MainScene:keyDragMoved(keyDrag, id, x, y)
+    local startX = keyDrag.x
+    local startY = keyDrag.y
+    local num, keyWait, keyX, keyY
+    local dragNum
+
+    for i,v in ipairs(self.waitKeys) do
+        if v.tag == keyDrag.tag then
+            num = i
+            keyWait = v
+            keyX = v:getPositionX()
+            keyY = v:getPositionY()
+        end
     end
 
-    if event == "began" then
-        --playing
-        if self.status == "playing" then
-            for i,p in ipairs(tp) do --触摸点循环
-                for ii,keysback in ipairs(self.keysBacks) do --背景按键循环
-                    if keysback:getBoundingBox():containsPoint(p) then --如果按到了按键
-                        local isWaitKey = false
-                        for iii,keyswait in ipairs(self.waitKeys) do --等待按键循环
-                            if keyswait:getBoundingBox():containsPoint(p) and keyswait.status == "wait" then
-                                isWaitKey = true
-                                self:keyPressed(keyswait, p)
-                                break
-                            end
-                        end
+    -- for i,v in ipairs(self.dragKeys) do
+    --     if v.tag == keyDrag.tag then
+    --         dragNum = i
+    --     end
+    -- end
+    if num then
+        if keyDrag.type == 1 and ((math.abs(startY - y) >= dragThreshold) or (math.abs(startX - x) >= dragThreshold)) then
+            self:gameEnded(keyWait)
+        elseif (keyDrag.type == 2 and y - startY >= dragThreshold) or (keyDrag.type == 3 and x - startX >= dragThreshold)
+            or (keyDrag.type == 4 and startX - x >= dragThreshold) or (keyDrag.type == 5 and startY - y >= dragThreshold) then
+            self:gameEnded(keyWait)
+        elseif keyDrag.type == 2 and startY - y >= dragThreshold then
+            table.remove(self.waitKeys, num)
 
-                        if not isWaitKey then --按到了其他按键上
-                            self:gameEnded()
-                        end
-                    end
-                end                
+            audio.playSound(PIANO_SOUND[self:getMusicScore()], false)
+            local action = CCMoveTo:create(0.15, ccp(keyX, py - keyAreaHeight / 2 - keyWidth))
+            local action2 = CCCallFuncN:create(handler(self, self.removeKey))
+            local action3 = CCRotateBy:create(0.15, 360)
+            local action4 = CCScaleBy:create(0.15, 0.5)
+            keyWait:runAction(transition.sequence({action,action2,}))
+            keyWait:runAction(action3)
+            keyWait:runAction(action4)
+
+            self.score = self.score + 1
+            self.scoreLabel:setString(self.score)
+            if highScore < self.score then
+                highScore = self.score
+                self.highScoreLabel:setString(highScore)
             end
-        --wait to play
-        elseif self.status == "waitToPlay" then
-            for i,v in ipairs(tp) do
-                for _i,_v in ipairs(self.waitKeys) do
-                    if _v:getBoundingBox():containsPoint(v) then
-                        if _v.status == "wait" then
-                            self:keyPressed(_v, v)
-                        end
+
+            return false
+
+        elseif keyDrag.type == 3 and startX - x >= dragThreshold then
+            table.remove(self.waitKeys, num)
+
+            audio.playSound(PIANO_SOUND[self:getMusicScore()], false)
+            local action = CCMoveTo:create(0.15, ccp(px - keyAreaHeight / 2 - keyWidth, keyY))
+            local action2 = CCCallFuncN:create(handler(self, self.removeKey))
+            local action3 = CCRotateBy:create(0.15, 360)
+            local action4 = CCScaleBy:create(0.15, 0.5)
+            keyWait:runAction(transition.sequence({action,action2,}))
+            keyWait:runAction(action3)
+            keyWait:runAction(action4)
+
+            self.score = self.score + 1
+            self.scoreLabel:setString(self.score)
+            if highScore < self.score then
+                highScore = self.score
+                self.highScoreLabel:setString(highScore)
+            end
+
+            return false
+
+        elseif keyDrag.type == 4 and x - startX >= dragThreshold then
+            table.remove(self.waitKeys, num)
+
+            audio.playSound(PIANO_SOUND[self:getMusicScore()], false)
+            local action = CCMoveTo:create(0.15, ccp(px + keyAreaHeight / 2 + keyWidth, keyY))
+            local action2 = CCCallFuncN:create(handler(self, self.removeKey))
+            local action3 = CCRotateBy:create(0.15, 360)
+            local action4 = CCScaleBy:create(0.15, 0.5)
+            keyWait:runAction(transition.sequence({action,action2,}))
+            keyWait:runAction(action3)
+            keyWait:runAction(action4)
+
+            self.score = self.score + 1
+            self.scoreLabel:setString(self.score)
+            if highScore < self.score then
+                highScore = self.score
+                self.highScoreLabel:setString(highScore)
+            end
+
+            return false
+
+        elseif keyDrag.type == 5 and y - startY >= dragThreshold then
+            table.remove(self.waitKeys, num)
+
+            audio.playSound(PIANO_SOUND[self:getMusicScore()], false)
+            local action = CCMoveTo:create(0.15, ccp(keyX, py + keyAreaHeight / 2 + keyWidth))
+            local action2 = CCCallFuncN:create(handler(self, self.removeKey))
+            local action3 = CCRotateBy:create(0.15, 360)
+            local action4 = CCScaleBy:create(0.15, 0.5)
+            keyWait:runAction(transition.sequence({action,action2,}))
+            keyWait:runAction(action3)
+            keyWait:runAction(action4)
+
+            self.score = self.score + 1
+            self.scoreLabel:setString(self.score)
+            if highScore < self.score then
+                highScore = self.score
+                self.highScoreLabel:setString(highScore)
+            end
+
+            return false
+            
+        end
+    end
+    
+end
+
+function MainScene:keyDragEnded(keyDrag, id, x, y)
+    for i,v in ipairs(self.waitKeys) do
+        if v.tag == keyDrag.tag then
+            if keyDrag.type == 1 then
+                table.remove(self.waitKeys, i)
+                self:keyPressed(v)
+            else
+                self:gameEnded(v)
+            end
+        end
+    end
+end
+
+function MainScene:removeKey(key)
+    self.keyArea:removeChild(key, true)
+end
+
+function MainScene:onTouches(event)
+    for id, point in pairs(event.points) do
+        self:onTouch(event.name, point.id, point.x, point.y)
+    end
+end
+
+function MainScene:onTouch(eventName, id, x, y)
+    if eventName == "began" then
+        self:onTouchBegan(eventName, id, x, y)
+    elseif eventName == "moved" then
+        self:onTouchMoved(eventName, id, x, y)
+    elseif eventName == "ended" then
+        self:onTouchEnded(eventName, id, x, y)
+    else -- cancled
+        self:onTouchCancelled(eventName, id, x, y)
+    end
+end
+
+function MainScene:onTouchBegan(eventName, id, x, y)
+    local p = ccp(x, y)
+    
+    --playing
+    if self.status == "playing" then
+        for i,keysback in ipairs(self.keysBacks) do --背景按键循环
+            if keysback:getBoundingBox():containsPoint(p) then --如果按到了按键
+                local isWaitKey = false
+                for ii,keyWait in ipairs(self.waitKeys) do --等待按键循环
+                    if keyWait:getBoundingBox():containsPoint(p) then
+                        isWaitKey = true
+                        self:keyDragBegan(keyWait, id, x, y)
+
+                        return true
+
+                        -- if keyWait.type == 1 then
+                        --     table.remove(self.waitKeys, ii)
+                        --     self:keyPressed(keyWait)
+                        --     return false
+                        -- else
+                        --     self:keyDragBegan(keyWait, id, x, y)
+                        --     return true
+                        -- end
+                        -- break
                     end
                 end
+
+                if not isWaitKey then --按到了其他按键上
+                    self:gameEnded(keysback)
+                    return false
+                end
             end
-        -- dead
-        elseif self.status == "dead" then
-            for i,v in ipairs(tp) do
-                if self.tryAgainLabel:getBoundingBox():containsPoint(v) then
-                    self:restart()
+        end  
+    --wait to play
+    elseif self.status == "waitToPlay" then
+        for i,v in ipairs(self.waitKeys) do
+            if v:getBoundingBox():containsPoint(p) then
+                if v.type == 1 then
+                    table.remove(self.waitKeys, i)  
+                    self:keyPressed(v, p)
+                    return false
                 end
             end
         end
-    elseif event == "moved" then
-
-    elseif event == "ended" then
-
-    else -- cancled
-
+    -- dead
+    elseif self.status == "dead" then
+        if self.tryAgainLabel:getBoundingBox():containsPoint(p) then
+            self:restart()
+        end
     end
+end
 
-    return true
+function MainScene:onTouchMoved(eventName, id, x, y)
+    if self.status == "playing" then
+        for i,v in ipairs(self.dragKeys) do
+            if v.id == id then
+                self:keyDragMoved(v, id, x, y)
+            end
+        end
+    end
+end
+
+function MainScene:onTouchEnded(eventName, id, x, y)
+    if self.status == "playing" then
+        for i,v in ipairs(self.dragKeys) do
+            if v.id == id then
+                self:keyDragEnded(v, id, x, y)
+                table.remove(self.dragKeys, i)
+            end
+        end
+    end
+end
+
+function MainScene:onTouchCancelled(eventName, id, x, y)
+    -- self.drag = nil
 end
 
 function MainScene:restart()
@@ -263,6 +446,10 @@ function MainScene:restart()
         -- self.waitKeys[1]:keyUp()
         self.keyArea:removeChild(self.waitKeys[1], true)
         table.remove(self.waitKeys, 1)
+    end
+
+    for i = 1, #self.dragKeys do
+        table.remove(self.dragKeys, 1)
     end
 
     --重置乐谱
@@ -287,7 +474,8 @@ end
 
 function MainScene:genWaitKeys()
     if (self.status == "playing" and self.waitTag <= 0) or (self.status == "waitToPlay") then
-        self:genWaitKey(1)
+        local i = math.random(5)
+        self:genWaitKey(i)
         
         -- self.progressTime:setPercentage(100.0)
         self.waitTag = waitTime
@@ -303,7 +491,16 @@ function MainScene:genWaitKey(type)
         for i,v in ipairs(self.waitKeys) do
             if v.tag == num then
                 flag = false
+                break
             end
+        end
+
+        if (type == 2 and (num == 1 or num == 2 or num == 3 or num == 4))
+            or (type == 3 and (num == 1 or num == 5 or num == 9 or num == 13))
+            or (type == 4 and (num == 4 or num == 8 or num == 12 or num == 16))
+            or (type == 5 and (num == 13 or num == 14 or num == 15 or num == 16)) then
+            flag = false
+
         end
 
         if flag then
@@ -311,12 +508,17 @@ function MainScene:genWaitKey(type)
         end
     end
 
-    local genedKey = Keys.new(1)
+    local genedKey = Keys.new(type)
     genedKey.tag = num
     genedKey:setPosition(self.positions[num].x, self.positions[num].y)
     -- self:addChild(genedKey, -8)
     self.keyArea:addChild(genedKey)
     self.waitKeys[#self.waitKeys + 1] = genedKey
+    -- genedKey:setTouchEnabled(true)
+    -- genedKey:setTouchSwallowEnabled(true)
+    -- genedKey:addNodeEventListener(cc.NODE_TOUCH_EVENT, function(event)
+    --     return self:keyOnTouch(event)
+    -- end)
 
     if self.status == "playing" then        
         self.waitTag = waitTime
@@ -378,17 +580,19 @@ function MainScene:getMusicScore()
     return music
 end
 
-function MainScene:gameEnded()    
+function MainScene:gameEnded(key)    
     self.status = "splash"
-    for i,v in ipairs(self.waitKeys) do
-        if i == 1 then
-            v:keySplash(handler(self,self.gameEnded2))
-        else
-            v:keySplash()
+    if key then
+        key:keySplash(handler(self,self.gameEnded2))
+    else
+        for i,v in ipairs(self.waitKeys) do
+            if i == 1 then
+                v:keySplash(handler(self,self.gameEnded2))
+            else
+                v:keySplash()
+            end
         end
-    end
-
-    
+    end   
 end
 
 function MainScene:gameEnded2()
@@ -490,18 +694,27 @@ function MainScene:levelUpdate()
     elseif self.level == 2 and self.score == 10 then
         waitTime = waitTime - 10
         self.level = self.level + 1
-    elseif self.level == 3 and self.score == 15 then
-        waitTime = waitTime - 10
+    elseif self.level == 3 and self.score == 30 then
+        waitTime = waitTime - 5
         self.level = self.level + 1
-    elseif self.level == 4 and self.score == 20 then
-    --     waitTime = waitTime - 10
-    --     self.level = self.level + 1
-    -- elseif self.level == 5 and self.score == 25 then
-    --     waitTime = waitTime - 10
-    --     self.level = self.level + 1
-    -- elseif self.level == 6 and self.score == 30 then
+    elseif self.level == 4 and self.score == 80 then
+        waitTime = waitTime - 5
         self.level = self.level + 1
-        -- waitTime = 90
+    elseif self.level == 5 and self.score == 110 then
+        waitTime = waitTime - 1
+        self.level = self.level + 1
+    elseif self.level == 6 and self.score == 140 then
+        waitTime = waitTime - 1
+        self.level = self.level + 1
+    elseif self.level == 7 and self.score == 170 then
+        waitTime = waitTime - 1
+        self.level = self.level + 1
+    elseif self.level == 8 and self.score == 200 then
+        waitTime = waitTime - 1
+        self.level = self.level + 1
+    elseif self.level == 8 and self.score == 250 then
+        waitTime = waitTime - 1
+        self.level = self.level + 1
     end
 end
 
@@ -524,7 +737,9 @@ function MainScene:onEnter()
     -- self:genWaitKeys()
     self:restart()
 
-    self:scheduleUpdate(function(dt) self:updateFrame(dt) end)
+    -- self:scheduleUpdate(function(dt) self:updateFrame(dt) end)
+    self:addNodeEventListener(cc.NODE_ENTER_FRAME_EVENT, function(dt) self:updateFrame(dt) end)
+    self:scheduleUpdate()
 
     if device.platform == "android" then
         -- avoid unmeant back

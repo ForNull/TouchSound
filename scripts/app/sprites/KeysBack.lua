@@ -20,4 +20,13 @@ function KeysBack:setPlace(order, bgx, bgy)
 	self:setPosition(bgx + (a - 2) * (keyWidht + dis) + (keyWidht + dis) / 2, bgy + (b - 2) * (keyWidht + dis) + (keyWidht + dis) / 2)
 end
 
+function KeysBack:keySplash(funcCall)
+	local keyUp = display.newSpriteFrame("down.png")
+	local keyWait = display.newSpriteFrame("up.png")
+	local frames = {keyUp, keyWait, keyUp, keyWait, keyUp, keyWait}
+	local animation = display.newAnimation(frames, 1 / 6)
+
+	transition.playAnimationOnce(self,animation,false,funcCall)
+end
+
 return KeysBack
